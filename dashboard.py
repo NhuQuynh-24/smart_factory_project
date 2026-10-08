@@ -1,367 +1,1334 @@
 import os
-import pandas as pd
 import pymysql
+import pandas as pd
 import streamlit as st
-from streamlit_autorefresh import st_autorefresh
+
+try:
+    from streamlit_autorefresh import st_autorefresh
+except ImportError:
+    st_autorefresh = None
 
 
-# ============================================================
-# PAGE CONFIG
-# ============================================================
+# =========================================================
+# CẤU HÌNH TRANG
+# =========================================================
 
 st.set_page_config(
-    page_title="Smart Factory Monitoring",
+    page_title="NHÀ MÁY THÔNG MINH",
     page_icon="🔥",
     layout="wide"
 )
 
 
-# ============================================================
-# AUTO REFRESH - 30 seconds
-# ============================================================
+# =========================================================
+# CSS GIAO DIỆN
+# =========================================================
 
-st_autorefresh(
-    interval=30000,
-    key="smart_factory_refresh"
+st.markdown("""
+<style>
+
+.stApp {
+    background: #0b1220;
+    color: #e5e7eb;
+}
+
+.block-container {
+    max-width: 1500px;
+    padding-top: 1.4rem;
+}
+
+
+/* ================= HEADER ================= */
+
+.hero {
+    background: linear-gradient(
+        135deg,
+        #111827,
+        #172554,
+        #0f172a
+    );
+
+    border: 1px solid #26344d;
+    border-radius: 20px;
+
+    padding: 24px 28px;
+    margin-bottom: 18px;
+
+    box-shadow: 0 10px 35px #0004;
+}
+
+.hero-title {
+    font-size: 32px;
+    font-weight: 800;
+    color: #f8fafc;
+}
+
+.hero-sub {
+    color: #94a3b8;
+    font-size: 14px;
+    margin-top: 5px;
+}
+
+.online {
+    display: inline-block;
+
+    background: #22c55e18;
+    color: #4ade80;
+
+    border: 1px solid #22c55e55;
+
+    padding: 7px 13px;
+    border-radius: 999px;
+
+    font-weight: 700;
+    font-size: 13px;
+}
+
+
+/* ================= THẺ THỐNG KÊ ================= */
+
+.card {
+    background: #111827;
+
+    border: 1px solid #26344d;
+    border-radius: 16px;
+
+    padding: 18px 20px;
+
+    min-height: 120px;
+
+    box-shadow: 0 8px 25px #0003;
+}
+
+.green {
+    border-top: 3px solid #22c55e;
+}
+
+.yellow {
+    border-top: 3px solid #f59e0b;
+}
+
+.red {
+    border-top: 3px solid #ef4444;
+}
+
+.blue {
+    border-top: 3px solid #38bdf8;
+}
+
+.label {
+    color: #94a3b8;
+
+    font-size: 12px;
+    font-weight: 700;
+
+    text-transform: uppercase;
+    letter-spacing: .7px;
+}
+
+.value {
+    font-size: 34px;
+    font-weight: 800;
+
+    margin-top: 8px;
+
+    color: #f8fafc;
+}
+
+.note {
+    color: #64748b;
+
+    font-size: 12px;
+
+    margin-top: 3px;
+}
+
+
+/* ================= TIÊU ĐỀ SECTION ================= */
+
+.title {
+    font-size: 20px;
+    font-weight: 800;
+
+    color: #f8fafc;
+
+    margin: 20px 0 10px;
+}
+
+.sub {
+    color: #64748b;
+
+    font-size: 12px;
+
+    margin-top: -6px;
+    margin-bottom: 12px;
+}
+
+
+/* ================= CẢNH BÁO ================= */
+
+.alert {
+    border-radius: 16px;
+
+    padding: 16px;
+    margin-bottom: 10px;
+
+    border: 1px solid;
+}
+
+.fire {
+    background: #ef444412;
+    border-color: #ef444466;
+}
+
+.risk {
+    background: #f59e0b12;
+    border-color: #f59e0b66;
+}
+
+.alert-title {
+    font-size: 17px;
+    font-weight: 800;
+
+    margin-bottom: 7px;
+}
+
+.meta {
+    color: #cbd5e1;
+
+    font-size: 13px;
+
+    line-height: 1.65;
+}
+
+
+/* ================= KHÔNG CÓ CẢNH BÁO ================= */
+
+.ok {
+    background: #22c55e0d;
+
+    border: 1px solid #22c55e44;
+
+    border-radius: 16px;
+
+    padding: 24px;
+
+    text-align: center;
+
+    color: #86efac;
+
+    font-weight: 700;
+}
+
+
+/* ================= KHU VỰC ================= */
+
+.zone {
+    background: #111827;
+
+    border: 1px solid #26344d;
+
+    border-radius: 14px;
+
+    padding: 13px;
+
+    min-height: 90px;
+
+    margin-bottom: 10px;
+}
+
+.zone-name {
+    font-size: 13px;
+
+    font-weight: 700;
+
+    color: #e2e8f0;
+}
+
+.zone-count {
+    font-size: 11px;
+
+    color: #64748b;
+
+    margin-top: 5px;
+}
+
+.pill {
+    display: inline-block;
+
+    margin-top: 8px;
+
+    padding: 4px 8px;
+
+    border-radius: 999px;
+
+    font-size: 10px;
+
+    font-weight: 800;
+}
+
+.pn {
+    background: #22c55e18;
+    color: #4ade80;
+}
+
+.pr {
+    background: #f59e0b18;
+    color: #fbbf24;
+}
+
+.pf {
+    background: #ef444418;
+    color: #f87171;
+}
+
+
+/* ================= ẨN STREAMLIT ================= */
+
+#MainMenu,
+footer,
+header {
+    visibility: hidden;
+}
+
+</style>
+""", unsafe_allow_html=True)
+
+
+# =========================================================
+# CẤU HÌNH MARIADB
+# =========================================================
+
+DB_HOST = os.getenv(
+    "MARIADB_HOST",
+    "localhost"
+)
+
+DB_PORT = int(
+    os.getenv(
+        "MARIADB_PORT",
+        "3306"
+    )
+)
+
+DB_USER = os.getenv(
+    "MARIADB_USER",
+    "root"
+)
+
+DB_PASSWORD = os.getenv(
+    "MARIADB_PASSWORD",
+    ""
+)
+
+DB_NAME = os.getenv(
+    "MARIADB_DATABASE",
+    "smart_factory"
 )
 
 
-# ============================================================
-# DATABASE
-# ============================================================
+# =========================================================
+# KẾT NỐI MARIADB
+# =========================================================
 
-DB_PASSWORD = os.getenv("MARIADB_PASSWORD", "")
+@st.cache_resource
+def db():
 
-if not DB_PASSWORD:
-    st.error("Chưa có MARIADB_PASSWORD.")
-    st.stop()
-
-
-def get_connection():
     return pymysql.connect(
-        host="localhost",
-        user="root",
+        host=DB_HOST,
+        port=DB_PORT,
+        user=DB_USER,
         password=DB_PASSWORD,
-        database="smart_factory",
-        cursorclass=pymysql.cursors.DictCursor
+        database=DB_NAME,
+
+        cursorclass=pymysql.cursors.DictCursor,
+
+        autocommit=True
     )
 
 
-# ============================================================
-# HEADER
-# ============================================================
+# =========================================================
+# ĐỌC DỮ LIỆU
+# =========================================================
 
-st.title("🔥 SMART FACTORY")
-st.subheader("Hệ thống giám sát và cảnh báo cháy theo thời gian thực")
-st.caption(
-    "Spark Structured Streaming → Spark ML → MariaDB → Streamlit"
-)
+def load_data():
+
+    query = """
+    SELECT
+        id,
+        sensor_id,
+        zone,
+        timestamp,
+        temperature,
+        humidity,
+        smoke_ppm,
+        lpg_gas_ppm,
+        co_gas_ppm,
+        prediction,
+        prediction_label,
+        probability_normal,
+        probability_risk,
+        probability_fire,
+        created_at
+
+    FROM sensor_predictions
+
+    ORDER BY id DESC
+
+    LIMIT 500
+    """
+
+    return pd.read_sql(
+        query,
+        db()
+    )
 
 
-# ============================================================
-# DATABASE CONNECTION
-# ============================================================
+# =========================================================
+# HÀM CHUYỂN FLOAT AN TOÀN
+# =========================================================
+
+def safe_float(value):
+
+    try:
+
+        if value is None:
+            return 0.0
+
+        return float(value)
+
+    except (TypeError, ValueError):
+
+        return 0.0
+
+
+# =========================================================
+# TỰ ĐỘNG REFRESH 30 GIÂY
+# =========================================================
+
+if st_autorefresh:
+
+    st_autorefresh(
+        interval=30000,
+        key="smart_factory_refresh"
+    )
+
+
+# =========================================================
+# ĐỌC DATABASE
+# =========================================================
 
 try:
-    conn = get_connection()
+
+    df = load_data()
+
 except Exception as e:
-    st.error(f"Không kết nối được MariaDB: {e}")
+
+    st.error(
+        f"❌ Không thể kết nối MariaDB: {e}"
+    )
+
     st.stop()
 
 
-# ============================================================
-# SUMMARY
-# ============================================================
+# =========================================================
+# HEADER
+# =========================================================
 
-with conn.cursor() as cursor:
+st.markdown(
+    """
+    <div class="hero">
 
-    cursor.execute("""
-        SELECT COUNT(*) AS total
-        FROM sensor_predictions
-    """)
-    total = cursor.fetchone()["total"]
+        <div style="
+            display:flex;
+            justify-content:space-between;
+            align-items:center;
+            gap:20px;
+        ">
 
-    cursor.execute("""
-        SELECT COUNT(*) AS total
-        FROM sensor_predictions
-        WHERE prediction = 0
-    """)
-    normal = cursor.fetchone()["total"]
+            <div>
 
-    cursor.execute("""
-        SELECT COUNT(*) AS total
-        FROM sensor_predictions
-        WHERE prediction = 1
-    """)
-    risk = cursor.fetchone()["total"]
+                <div class="hero-title">
+                    🔥 NHÀ MÁY THÔNG MINH
+                </div>
 
-    cursor.execute("""
-        SELECT COUNT(*) AS total
-        FROM sensor_predictions
-        WHERE prediction = 2
-    """)
-    fire = cursor.fetchone()["total"]
+                <div class="hero-sub">
+                    Hệ thống giám sát và cảnh báo nguy cơ cháy nổ
+                    theo thời gian thực
+                </div>
 
+            </div>
 
-# ============================================================
-# KPI
-# ============================================================
+            <div class="online">
+                ● HỆ THỐNG ĐANG HOẠT ĐỘNG
+            </div>
 
-st.markdown("### 📊 Tổng quan")
+        </div>
 
-col1, col2, col3, col4 = st.columns(4)
-
-col1.metric(
-    "TỔNG RECORD",
-    f"{total:,}"
-)
-
-col2.metric(
-    "🟢 NORMAL",
-    f"{normal:,}"
-)
-
-col3.metric(
-    "🟡 FIRE_RISK",
-    f"{risk:,}"
-)
-
-col4.metric(
-    "🔴 FIRE",
-    f"{fire:,}"
+    </div>
+    """,
+    unsafe_allow_html=True
 )
 
 
-# ============================================================
-# STATUS SUMMARY
-# ============================================================
+# =========================================================
+# CHƯA CÓ DỮ LIỆU
+# =========================================================
 
-st.markdown("---")
-st.markdown("### 🚦 Tình trạng hệ thống")
+if df.empty:
 
-if fire > 0:
+    st.markdown(
+        """
+        <div class="ok">
 
-    st.error(
-        f"🔥 Đang có {fire:,} record được dự đoán là FIRE."
+            📡
+
+            <br><br>
+
+            ĐANG CHỜ DỮ LIỆU SENSOR
+
+            <br><br>
+
+            <span style="
+                font-size:12px;
+                color:#64748b;
+            ">
+
+                Python Sensor
+                →
+                Kafka
+                →
+                Spark Structured Streaming
+                →
+                Spark ML
+                →
+                MariaDB
+
+            </span>
+
+        </div>
+        """,
+        unsafe_allow_html=True
     )
 
-elif risk > 0:
+    st.stop()
 
-    st.warning(
-        f"⚠️ Đang có {risk:,} record được dự đoán là FIRE_RISK."
+
+# =========================================================
+# CHUẨN HÓA DỮ LIỆU
+# =========================================================
+
+df["timestamp"] = pd.to_datetime(
+    df["timestamp"],
+    errors="coerce"
+)
+
+df["prediction_label"] = (
+    df["prediction_label"]
+    .fillna("NORMAL")
+)
+
+
+# =========================================================
+# LẤY TRẠNG THÁI MỚI NHẤT CỦA MỖI SENSOR
+# =========================================================
+
+latest = (
+    df
+    .sort_values("id")
+    .drop_duplicates(
+        "sensor_id",
+        keep="last"
+    )
+)
+
+
+status = (
+    latest["prediction_label"]
+    .fillna("NORMAL")
+)
+
+
+normal = int(
+    (status == "NORMAL").sum()
+)
+
+risk = int(
+    (status == "FIRE_RISK").sum()
+)
+
+fire = int(
+    (status == "FIRE").sum()
+)
+
+sensors = int(
+    latest["sensor_id"].nunique()
+)
+
+
+# =========================================================
+# 4 THẺ THỐNG KÊ
+# =========================================================
+
+cols = st.columns(4)
+
+
+cards = [
+
+    (
+        "green",
+        "🟢 BÌNH THƯỜNG",
+        normal,
+        "Sensor đang hoạt động bình thường"
+    ),
+
+    (
+        "yellow",
+        "🟡 NGUY CƠ CHÁY",
+        risk,
+        "Phát hiện điều kiện bất thường"
+    ),
+
+    (
+        "red",
+        "🔴 CHÁY",
+        fire,
+        "Phát hiện tình trạng cháy"
+    ),
+
+    (
+        "blue",
+        "📡 SENSOR",
+        sensors,
+        "Số sensor đang được giám sát"
+    )
+]
+
+
+for column, data in zip(
+    cols,
+    cards
+):
+
+    css_class, label, value, note = data
+
+    with column:
+
+        st.markdown(
+            f"""
+            <div class="card {css_class}">
+
+                <div class="label">
+                    {label}
+                </div>
+
+                <div class="value">
+                    {value}
+                </div>
+
+                <div class="note">
+                    {note}
+                </div>
+
+            </div>
+            """,
+            unsafe_allow_html=True
+        )
+
+
+# =========================================================
+# TRẠNG THÁI GIÁM SÁT
+# =========================================================
+
+st.markdown(
+    """
+    <div class="title">
+        🚨 TRẠNG THÁI GIÁM SÁT HIỆN TẠI
+    </div>
+    """,
+    unsafe_allow_html=True
+)
+
+
+left, right = st.columns(
+    [1.55, 1],
+    gap="large"
+)
+
+
+# =========================================================
+# BIỂU ĐỒ SENSOR
+# =========================================================
+
+with left:
+
+    st.markdown(
+        "**📈 Biểu đồ thông số sensor theo thời gian**"
     )
 
-else:
 
-    st.success(
-        "✅ Hệ thống hiện đang ở trạng thái NORMAL."
+    metric = st.selectbox(
+
+        "Chọn thông số",
+
+        [
+            "temperature",
+            "smoke_ppm",
+            "lpg_gas_ppm",
+            "co_gas_ppm"
+        ],
+
+        format_func=lambda x: {
+
+            "temperature":
+                "🌡 Nhiệt độ (°C)",
+
+            "smoke_ppm":
+                "💨 Khói (ppm)",
+
+            "lpg_gas_ppm":
+                "🔥 Khí LPG (ppm)",
+
+            "co_gas_ppm":
+                "☠ Khí CO (ppm)"
+
+        }[x],
+
+        label_visibility="collapsed"
     )
 
 
-# ============================================================
-# LATEST DATA
-# ============================================================
+    chart_data = (
 
-st.markdown("---")
-st.markdown("### 📡 Dữ liệu sensor mới nhất")
+        df
 
-with conn.cursor() as cursor:
+        .sort_values("timestamp")
 
-    cursor.execute("""
-        SELECT
-            sensor_id,
-            zone,
-            timestamp,
-            temperature,
-            humidity,
-            smoke_ppm,
-            lpg_gas_ppm,
-            co_gas_ppm,
-            prediction,
-            prediction_label,
-            probability_normal,
-            probability_risk,
-            probability_fire
-        FROM sensor_predictions
-        ORDER BY id DESC
-        LIMIT 50
-    """)
+        .dropna(
+            subset=["timestamp"]
+        )
 
-    latest_rows = cursor.fetchall()
+        .tail(200)
+    )
 
 
-latest_df = pd.DataFrame(latest_rows)
+    if not chart_data.empty:
+
+        trend = (
+
+            chart_data
+
+            .groupby("timestamp")[metric]
+
+            .mean()
+
+            .tail(100)
+
+            .to_frame()
+        )
 
 
-if latest_df.empty:
+        st.line_chart(
 
-    st.info("Chưa có dữ liệu.")
+            trend,
 
-else:
+            height=300,
 
-    latest_df["prediction_label"] = latest_df[
+            use_container_width=True
+
+        )
+
+
+# =========================================================
+# CẢNH BÁO ĐANG HOẠT ĐỘNG
+# =========================================================
+
+with right:
+
+    st.markdown(
+        "**🚨 Cảnh báo đang hoạt động**"
+    )
+
+
+    alerts = (
+
+        latest[
+
+            latest["prediction_label"]
+
+            .isin(
+                [
+                    "FIRE",
+                    "FIRE_RISK"
+                ]
+            )
+
+        ]
+
+        .sort_values(
+            "id",
+            ascending=False
+        )
+    )
+
+
+    if alerts.empty:
+
+        st.markdown(
+            """
+            <div class="ok">
+
+                🟢
+
+                <br><br>
+
+                KHÔNG CÓ CẢNH BÁO
+
+                <br><br>
+
+                <span style="
+                    font-size:12px;
+                    color:#64748b;
+                ">
+
+                    Tất cả sensor đang hoạt động
+                    bình thường.
+
+                </span>
+
+            </div>
+            """,
+            unsafe_allow_html=True
+        )
+
+
+    else:
+
+        for _, r in alerts.head(4).iterrows():
+
+            is_fire = (
+                r["prediction_label"]
+                == "FIRE"
+            )
+
+
+            css_class = (
+                "fire"
+                if is_fire
+                else "risk"
+            )
+
+
+            icon = (
+                "🔴"
+                if is_fire
+                else "🟡"
+            )
+
+
+            title = (
+
+                "PHÁT HIỆN CHÁY"
+
+                if is_fire
+
+                else
+
+                "PHÁT HIỆN NGUY CƠ CHÁY"
+
+            )
+
+
+            st.markdown(
+                f"""
+                <div class="alert {css_class}">
+
+                    <div class="alert-title">
+
+                        {icon}
+                        {title}
+
+                    </div>
+
+
+                    <div class="meta">
+
+                        <b>Sensor:</b>
+                        {r["sensor_id"]}
+
+                        <br>
+
+                        <b>Khu vực:</b>
+                        {r["zone"]}
+
+                        <br>
+
+                        <b>Nhiệt độ:</b>
+                        {safe_float(r["temperature"]):.1f}
+                        °C
+
+                        <br>
+
+                        <b>Khói:</b>
+                        {safe_float(r["smoke_ppm"]):.1f}
+                        ppm
+
+                        <br>
+
+                        <b>Khí LPG:</b>
+                        {safe_float(r["lpg_gas_ppm"]):.1f}
+                        ppm
+
+                        <br>
+
+                        <b>Khí CO:</b>
+                        {safe_float(r["co_gas_ppm"]):.1f}
+                        ppm
+
+                    </div>
+
+                </div>
+                """,
+                unsafe_allow_html=True
+            )
+
+
+# =========================================================
+# TRẠNG THÁI CÁC KHU VỰC
+# =========================================================
+
+st.markdown(
+    """
+    <div class="title">
+        🏭 TRẠNG THÁI CÁC KHU VỰC
+    </div>
+    """,
+    unsafe_allow_html=True
+)
+
+
+st.markdown(
+    """
+    <div class="sub">
+        Trạng thái mới nhất của từng khu vực trong nhà máy
+    </div>
+    """,
+    unsafe_allow_html=True
+)
+
+
+zones = (
+
+    latest
+
+    .groupby("zone")
+
+    .agg(
+
+        sensors=(
+            "sensor_id",
+            "nunique"
+        ),
+
+        fire=(
+            "prediction_label",
+            lambda x:
+                (x == "FIRE").sum()
+        ),
+
+        risk=(
+            "prediction_label",
+            lambda x:
+                (x == "FIRE_RISK").sum()
+        )
+
+    )
+
+    .reset_index()
+)
+
+
+zone_columns = st.columns(5)
+
+
+for i, (_, r) in enumerate(
+    zones.iterrows()
+):
+
+    if r["fire"] > 0:
+
+        icon = "🔴"
+        label = "CHÁY"
+        pill = "pf"
+
+
+    elif r["risk"] > 0:
+
+        icon = "🟡"
+        label = "NGUY CƠ CHÁY"
+        pill = "pr"
+
+
+    else:
+
+        icon = "🟢"
+        label = "BÌNH THƯỜNG"
+        pill = "pn"
+
+
+    with zone_columns[i % 5]:
+
+        st.markdown(
+            f"""
+            <div class="zone">
+
+                <div class="zone-name">
+
+                    {icon}
+                    {r["zone"]}
+
+                </div>
+
+
+                <div class="zone-count">
+
+                    {int(r["sensors"])}
+                    sensor đang giám sát
+
+                </div>
+
+
+                <span class="pill {pill}">
+
+                    {label}
+
+                </span>
+
+            </div>
+            """,
+            unsafe_allow_html=True
+        )
+
+
+# =========================================================
+# KẾT QUẢ DỰ ĐOÁN SPARK ML
+# =========================================================
+
+st.markdown(
+    """
+    <div class="title">
+        🤖 KẾT QUẢ DỰ ĐOÁN CỦA SPARK ML
+    </div>
+    """,
+    unsafe_allow_html=True
+)
+
+
+# Lấy bản ghi mới nhất
+latest_row = (
+
+    df
+
+    .sort_values(
+        "id",
+        ascending=False
+    )
+
+    .iloc[0]
+)
+
+
+# ---------------------------------------------------------
+# LẤY XÁC SUẤT AN TOÀN
+# ---------------------------------------------------------
+
+p_normal = safe_float(
+    latest_row.get(
+        "probability_normal",
+        0
+    )
+)
+
+
+p_risk = safe_float(
+    latest_row.get(
+        "probability_risk",
+        0
+    )
+)
+
+
+p_fire = safe_float(
+    latest_row.get(
+        "probability_fire",
+        0
+    )
+)
+
+
+a, b, c = st.columns(3)
+
+
+with a:
+
+    st.metric(
+        "🟢 BÌNH THƯỜNG",
+        f"{p_normal * 100:.1f}%"
+    )
+
+
+with b:
+
+    st.metric(
+        "🟡 NGUY CƠ CHÁY",
+        f"{p_risk * 100:.1f}%"
+    )
+
+
+with c:
+
+    st.metric(
+        "🔴 CHÁY",
+        f"{p_fire * 100:.1f}%"
+    )
+
+
+# =========================================================
+# DỮ LIỆU SENSOR MỚI NHẤT
+# =========================================================
+
+st.markdown(
+    """
+    <div class="title">
+        📋 DỮ LIỆU SENSOR MỚI NHẤT
+    </div>
+    """,
+    unsafe_allow_html=True
+)
+
+
+filter1, filter2 = st.columns(2)
+
+
+# ---------------------------------------------------------
+# LỌC KHU VỰC
+# ---------------------------------------------------------
+
+with filter1:
+
+    zone_filter = st.selectbox(
+
+        "Lọc theo khu vực",
+
+        [
+            "Tất cả"
+        ]
+        +
+        sorted(
+            df["zone"]
+            .dropna()
+            .unique()
+            .tolist()
+        )
+
+    )
+
+
+# ---------------------------------------------------------
+# LỌC TRẠNG THÁI
+# ---------------------------------------------------------
+
+with filter2:
+
+    status_filter = st.selectbox(
+
+        "Lọc theo trạng thái",
+
+        [
+            "Tất cả",
+            "NORMAL",
+            "FIRE_RISK",
+            "FIRE"
+        ],
+
+        format_func=lambda x: {
+
+            "Tất cả":
+                "Tất cả",
+
+            "NORMAL":
+                "🟢 Bình thường",
+
+            "FIRE_RISK":
+                "🟡 Nguy cơ cháy",
+
+            "FIRE":
+                "🔴 Cháy"
+
+        }[x]
+
+    )
+
+
+# =========================================================
+# ÁP DỤNG BỘ LỌC
+# =========================================================
+
+table = df.copy()
+
+
+if zone_filter != "Tất cả":
+
+    table = table[
+        table["zone"]
+        == zone_filter
+    ]
+
+
+if status_filter != "Tất cả":
+
+    table = table[
+        table["prediction_label"]
+        == status_filter
+    ]
+
+
+table = (
+
+    table
+
+    .sort_values(
+        "id",
+        ascending=False
+    )
+
+    .head(50)
+)
+
+
+# =========================================================
+# CHỌN CỘT HIỂN THỊ
+# =========================================================
+
+table = table[
+    [
+        "sensor_id",
+        "zone",
+        "timestamp",
+        "temperature",
+        "humidity",
+        "smoke_ppm",
+        "lpg_gas_ppm",
+        "co_gas_ppm",
         "prediction_label"
-    ].map({
-        "NORMAL": "🟢 NORMAL",
-        "FIRE_RISK": "🟡 FIRE_RISK",
-        "FIRE": "🔴 FIRE"
-    }).fillna(latest_df["prediction_label"])
+    ]
+].copy()
 
-    latest_df["probability_normal"] = (
-        latest_df["probability_normal"] * 100
-    ).round(2)
 
-    latest_df["probability_risk"] = (
-        latest_df["probability_risk"] * 100
-    ).round(2)
+# =========================================================
+# ĐỔI TÊN CỘT SANG TIẾNG VIỆT
+# =========================================================
 
-    latest_df["probability_fire"] = (
-        latest_df["probability_fire"] * 100
-    ).round(2)
+table.columns = [
 
-    latest_df = latest_df.rename(columns={
-        "sensor_id": "Sensor",
-        "zone": "Khu vực",
-        "timestamp": "Thời gian",
-        "temperature": "Nhiệt độ (°C)",
-        "humidity": "Độ ẩm (%)",
-        "smoke_ppm": "Khói (ppm)",
-        "lpg_gas_ppm": "LPG (ppm)",
-        "co_gas_ppm": "CO (ppm)",
-        "prediction": "Prediction",
-        "prediction_label": "Trạng thái",
-        "probability_normal": "Xác suất NORMAL (%)",
-        "probability_risk": "Xác suất FIRE_RISK (%)",
-        "probability_fire": "Xác suất FIRE (%)"
+    "Sensor",
+
+    "Khu vực",
+
+    "Thời gian",
+
+    "Nhiệt độ (°C)",
+
+    "Độ ẩm (%)",
+
+    "Khói (ppm)",
+
+    "LPG (ppm)",
+
+    "CO (ppm)",
+
+    "Trạng thái"
+
+]
+
+
+# =========================================================
+# ĐỔI TRẠNG THÁI SANG TIẾNG VIỆT
+# =========================================================
+
+table["Trạng thái"] = (
+
+    table["Trạng thái"]
+
+    .map({
+
+        "NORMAL":
+            "🟢 Bình thường",
+
+        "FIRE_RISK":
+            "🟡 Nguy cơ cháy",
+
+        "FIRE":
+            "🔴 Cháy"
+
     })
 
-    st.dataframe(
-        latest_df,
-        use_container_width=True,
-        hide_index=True
+    .fillna(
+        table["Trạng thái"]
     )
 
-
-# ============================================================
-# ABNORMAL ALERTS
-# ============================================================
-
-st.markdown("---")
-st.markdown("### 🚨 Cảnh báo gần nhất")
-
-with conn.cursor() as cursor:
-
-    cursor.execute("""
-        SELECT
-            sensor_id,
-            zone,
-            timestamp,
-            temperature,
-            smoke_ppm,
-            lpg_gas_ppm,
-            co_gas_ppm,
-            prediction_label,
-            probability_risk,
-            probability_fire
-        FROM sensor_predictions
-        WHERE prediction IN (1, 2)
-        ORDER BY id DESC
-        LIMIT 30
-    """)
-
-    alert_rows = cursor.fetchall()
-
-
-alert_df = pd.DataFrame(alert_rows)
-
-
-if alert_df.empty:
-
-    st.success("✅ Chưa phát hiện cảnh báo.")
-
-else:
-
-    alert_df["probability_risk"] = (
-        alert_df["probability_risk"] * 100
-    ).round(2)
-
-    alert_df["probability_fire"] = (
-        alert_df["probability_fire"] * 100
-    ).round(2)
-
-    alert_df = alert_df.rename(columns={
-        "sensor_id": "Sensor",
-        "zone": "Khu vực",
-        "timestamp": "Thời gian",
-        "temperature": "Nhiệt độ (°C)",
-        "smoke_ppm": "Khói (ppm)",
-        "lpg_gas_ppm": "LPG (ppm)",
-        "co_gas_ppm": "CO (ppm)",
-        "prediction_label": "Trạng thái",
-        "probability_risk": "Xác suất FIRE_RISK (%)",
-        "probability_fire": "Xác suất FIRE (%)"
-    })
-
-    st.dataframe(
-        alert_df,
-        use_container_width=True,
-        hide_index=True
-    )
-
-
-# ============================================================
-# ZONE SUMMARY
-# ============================================================
-
-st.markdown("---")
-st.markdown("### 🏭 Các khu vực đang có cảnh báo")
-
-with conn.cursor() as cursor:
-
-    cursor.execute("""
-        SELECT
-            zone,
-            prediction_label,
-            COUNT(*) AS total
-        FROM sensor_predictions
-        WHERE prediction IN (1, 2)
-        GROUP BY zone, prediction_label
-        ORDER BY zone, prediction_label
-    """)
-
-    zone_rows = cursor.fetchall()
-
-
-zone_df = pd.DataFrame(zone_rows)
-
-
-if zone_df.empty:
-
-    st.success("✅ Hiện chưa có khu vực bất thường.")
-
-else:
-
-    zone_df = zone_df.rename(columns={
-        "zone": "Khu vực",
-        "prediction_label": "Trạng thái",
-        "total": "Số record"
-    })
-
-    st.dataframe(
-        zone_df,
-        use_container_width=True,
-        hide_index=True
-    )
-
-
-# ============================================================
-# FOOTER
-# ============================================================
-
-st.markdown("---")
-
-st.caption(
-    "Dữ liệu được cập nhật tự động mỗi 30 giây."
 )
 
-conn.close()
+
+# =========================================================
+# HIỂN THỊ BẢNG
+# =========================================================
+
+st.dataframe(
+
+    table,
+
+    use_container_width=True,
+
+    hide_index=True,
+
+    height=430
+
+)
+
+
+# =========================================================
+# CHÂN TRANG
+# =========================================================
+
+st.markdown(
+    """
+    <div style="
+        text-align:center;
+        color:#475569;
+        font-size:12px;
+        padding:20px 0
+    ">
+
+        NHÀ MÁY THÔNG MINH
+
+        • Python Sensor
+        →
+        Kafka
+        →
+        Spark Structured Streaming
+        →
+        Spark ML
+        →
+        MariaDB
+        →
+        Streamlit
+
+        <br>
+
+        Tự động cập nhật dữ liệu sau mỗi 30 giây
+
+    </div>
+    """,
+    unsafe_allow_html=True
+)

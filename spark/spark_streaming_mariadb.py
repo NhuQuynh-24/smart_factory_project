@@ -49,7 +49,7 @@ spark.sparkContext.setLogLevel("WARN")
 MODEL_PATH = (
     "hdfs://localhost:9000/"
     "smart_factory_project/models/"
-    "random_forest_3class_rf1"
+    "random_forest_3class_rf3"
 )
 
 print("Loading model...")
@@ -417,7 +417,7 @@ query = (
         "checkpointLocation",
         "hdfs://localhost:9000/"
         "smart_factory_project/checkpoints/"
-        "sensor_mariadb_telegram_3class"
+        "sensor_mariadb_telegram_test"
     )
     .trigger(
         processingTime="30 seconds"
