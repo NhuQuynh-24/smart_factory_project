@@ -15,13 +15,11 @@ from pyspark.sql.functions import (
 )
 from pyspark.sql.window import Window
 from pyspark.ml import PipelineModel
-from pyspark.ml.linalg import Vector
-
-from pyspark.sql.types import DoubleType
 
 import os
 import sys
 
+# Cho phép import telegram_alert.py cùng thư mục
 sys.path.append(
     os.path.dirname(os.path.abspath(__file__))
 )
@@ -172,6 +170,10 @@ def extract_probability(index):
     )
 
 
+# Lưu ý:
+# Thứ tự xác suất phải khớp với thứ tự nhãn thực tế
+# của mô hình đã huấn luyện.
+
 prob_normal = extract_probability(0)
 prob_risk = extract_probability(1)
 prob_fire = extract_probability(2)
@@ -193,16 +195,14 @@ def write_to_mariadb(batch_df, batch_id):
 
         return
 
-
     # ========================================================
     # Spark ML prediction
     # ========================================================
 
     predictions = model.transform(batch_df)
 
-
     # ========================================================
-    # 3-class prediction
+    # Map prediction to class label
     # ========================================================
 
     predictions = (
@@ -246,9 +246,8 @@ def write_to_mariadb(batch_df, batch_id):
         )
     )
 
-
     # ========================================================
-    # Ghi toàn bộ batch vào MariaDB
+    # Write the entire batch to MariaDB
     # ========================================================
 
     mariadb_df = predictions.select(
@@ -267,7 +266,6 @@ def write_to_mariadb(batch_df, batch_id):
         "probability_fire"
     )
 
-
     mariadb_df.write.jdbc(
         url=JDBC_URL,
         table=JDBC_TABLE,
@@ -275,12 +273,10 @@ def write_to_mariadb(batch_df, batch_id):
         properties=JDBC_PROPERTIES
     )
 
-
     print("Đã ghi batch vào MariaDB.")
 
-
     # ========================================================
-    # Chỉ lấy FIRE_RISK và FIRE
+    # Only FIRE_RISK and FIRE
     # ========================================================
 
     abnormal_df = (
@@ -290,7 +286,6 @@ def write_to_mariadb(batch_df, batch_id):
         )
     )
 
-
     if abnormal_df.rdd.isEmpty():
 
         print("Batch chỉ có NORMAL.")
@@ -298,9 +293,8 @@ def write_to_mariadb(batch_df, batch_id):
 
         return
 
-
     # ========================================================
-    # Lấy record mới nhất của từng sensor + zone
+    # Latest record for each sensor + zone
     # ========================================================
 
     window_spec = (
@@ -314,7 +308,6 @@ def write_to_mariadb(batch_df, batch_id):
         )
     )
 
-
     abnormal_latest = (
         abnormal_df
         .withColumn(
@@ -327,63 +320,75 @@ def write_to_mariadb(batch_df, batch_id):
         .drop("rn")
     )
 
-
     # ========================================================
     # FIRE
     # ========================================================
 
     fire_rows = (
-    abnormal_latest
-    .filter(
-        col("prediction_int") == 2
+        abnormal_latest
+        .filter(
+            col("prediction_int") == 2
+        )
+        .select(
+            "sensor_id",
+            "zone",
+            "timestamp",
+            "temperature",
+            "smoke_ppm",
+            "lpg_gas_ppm",
+            "co_gas_ppm",
+
+            # Bổ sung hai trường quan trọng
+            "prediction",
+            "prediction_label",
+
+            "probability_fire",
+            "probability_risk"
+        )
+        .collect()
     )
-    .select(
-        "sensor_id",
-        "zone",
-        "timestamp",
-        "temperature",
-        "smoke_ppm",
-        "lpg_gas_ppm",
-        "co_gas_ppm",
-        "probability_fire"
-    )
-    .collect()
-)
 
     # ========================================================
     # FIRE_RISK
     # ========================================================
 
     risk_rows = (
-    abnormal_latest
-    .filter(
-        col("prediction_int") == 1
-    )
-    .select(
-        "sensor_id",
-        "zone",
-        "timestamp",
-        "temperature",
-        "smoke_ppm",
-        "lpg_gas_ppm",
-        "co_gas_ppm",
-        "probability_risk"
-    )
-    .collect()
-)
+        abnormal_latest
+        .filter(
+            col("prediction_int") == 1
+        )
+        .select(
+            "sensor_id",
+            "zone",
+            "timestamp",
+            "temperature",
+            "smoke_ppm",
+            "lpg_gas_ppm",
+            "co_gas_ppm",
 
+            # Bổ sung hai trường quan trọng
+            "prediction",
+            "prediction_label",
+
+            "probability_risk",
+            "probability_fire"
+        )
+        .collect()
+    )
+
+    # ========================================================
+    # Convert Spark Rows to Python dictionaries
+    # ========================================================
 
     fire_rows = [
-        row.asDict()
+        row.asDict(recursive=True)
         for row in fire_rows
     ]
 
-
     risk_rows = [
-        row.asDict()
+        row.asDict(recursive=True)
         for row in risk_rows
     ]
-
 
     print(
         f"FIRE sensors      : {len(fire_rows)}"
@@ -392,7 +397,6 @@ def write_to_mariadb(batch_df, batch_id):
     print(
         f"FIRE_RISK sensors : {len(risk_rows)}"
     )
-
 
     # ========================================================
     # Telegram
@@ -424,7 +428,6 @@ query = (
     )
     .start()
 )
-
 
 print(
     "Spark Streaming -> "
