@@ -319,10 +319,24 @@ export default function Home() {
     const metrics = [
   {
     title: "TỔNG CẢM BIẾN",
-    value: 50,
-    detail: "Tổng số cảm biến của hệ thống",
+    value: TOTAL_SENSORS,
+    detail: "Tổng số cảm biến được cấu hình",
     icon: "⌁",
     tone: "blue" as const,
+  },
+  {
+    title: "ĐÃ CÓ DỮ LIỆU",
+    value: latestSensors.length,
+    detail: "Cảm biến đã xuất hiện trong API",
+    icon: "▤",
+    tone: "green" as const,
+  },
+  {
+    title: "CHƯA CÓ DỮ LIỆU",
+    value: missing,
+    detail: "Cảm biến chưa xuất hiện trong API",
+    icon: "○",
+    tone: "slate" as const,
   },
   {
     title: "NORMAL · AN TOÀN",
