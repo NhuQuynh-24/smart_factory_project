@@ -1,49 +1,52 @@
 import { NextResponse } from "next/server";
-import mysql from "mysql2/promise";
 
-
-const pool = mysql.createPool({
-  host: process.env.MARIADB_HOST || "127.0.0.1",
-  port: Number(process.env.MARIADB_PORT || 3306),
-  user: process.env.MARIADB_USER || "smart_factory_app",
-  password: process.env.MARIADB_PASSWORD,
-  database: process.env.MARIADB_DATABASE || "smart_factory",
-  waitForConnections: true,
-  connectionLimit: 5,
-  queueLimit: 0,
-});
+export const dynamic = "force-dynamic";
 
 export async function GET() {
-  try {
-    const [rows] = await pool.execute(
-      `SELECT
-        id,
-        sensor_id,
-        zone,
-        timestamp,
-        temperature,
-        humidity,
-        smoke_ppm,
-        lpg_gas_ppm,
-        co_gas_ppm,
-        prediction,
-        prediction_label,
-        probability_normal,
-        probability_risk,
-        probability_fire,
-        created_at
-      FROM sensor_predictions
-      ORDER BY id DESC
-      LIMIT 100`
-    );
+  const apiUrl = process.env.SENSORS_API_URL;
+  const apiToken = process.env.SENSORS_API_TOKEN;
 
-    return NextResponse.json(rows);
-  } catch (error) {
-    console.error("Lỗi truy vấn MariaDB:", error);
+  if (!apiUrl || !apiToken) {
+    console.error("Thiếu SENSORS_API_URL hoặc SENSORS_API_TOKEN");
 
     return NextResponse.json(
-      { error: "Không thể lấy dữ liệu cảm biến" },
+      { error: "Server chưa được cấu hình API cảm biến" },
       { status: 500 }
+    );
+  }
+
+  try {
+    const response = await fetch(apiUrl, {
+      method: "GET",
+      headers: {
+        Authorization: `Bearer ${apiToken}`,
+      },
+      cache: "no-store",
+      signal: AbortSignal.timeout(10000),
+    });
+
+    if (!response.ok) {
+      console.error("Backend cảm biến trả về HTTP:", response.status);
+
+      return NextResponse.json(
+        { error: "Không thể lấy dữ liệu cảm biến" },
+        { status: 502 }
+      );
+    }
+
+    const data = await response.json();
+
+    return NextResponse.json(data, {
+      headers: {
+        "Cache-Control": "no-store",
+      },
+    });
+  } catch (error) {
+    console.error("Lỗi kết nối backend cảm biến:", error);
+
+    return NextResponse.json(
+      { error: "Không thể kết nối backend cảm biến" },
+      { status: 502 }
     );
   }
 }
