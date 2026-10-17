@@ -141,24 +141,32 @@ export default function Home() {
     );
   }, [sensors]);
 
-  const counts = useMemo(() => {
-    const result = {
-      total: latestSensors.length,
-      normal: 0,
-      risk: 0,
-      fire: 0,
-    };
+const TOTAL_SENSORS = 50;
 
-    for (const sensor of latestSensors) {
-      const status = getStatus(sensor);
+const counts = useMemo(() => {
+  let normal = 0;
+  let risk = 0;
+  let fire = 0;
 
-      if (status === "NORMAL") result.normal++;
-      if (status === "FIRE_RISK") result.risk++;
-      if (status === "FIRE") result.fire++;
-    }
+  for (const sensor of latestSensors) {
+    const status = getStatus(sensor);
 
-    return result;
-  }, [latestSensors]);
+    if (status === "NORMAL") normal++;
+    if (status === "FIRE_RISK") risk++;
+    if (status === "FIRE") fire++;
+  }
+
+  const received = latestSensors.length;
+
+  return {
+    total: TOTAL_SENSORS,
+    received,
+    normal,
+    risk,
+    fire,
+    unknown: Math.max(0, TOTAL_SENSORS - received),
+  };
+}, [latestSensors]);
 
   const filteredSensors = useMemo(() => {
     const query = search.trim().toLocaleLowerCase("vi-VN");
@@ -199,6 +207,12 @@ export default function Home() {
       value: counts.fire,
       icon: "!",
       style: "bg-red-50 text-red-700",
+    },
+    {
+  	title: "Chưa có dữ liệu",
+  	value: counts.unknown,
+  	icon: "◌",
+  	style: "bg-slate-100 text-slate-700",
     },
   ];
 
