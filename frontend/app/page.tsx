@@ -317,13 +317,49 @@ export default function Home() {
 
   function renderOverview() {
     const metrics = [
-      { title: "Tổng cảm biến cấu hình", value: TOTAL_SENSORS, detail: `${latestSensors.length} cảm biến đã xuất hiện trong dữ liệu API`, icon: "⌁", tone: "blue" as const },
-      { title: "NORMAL · An toàn", value: normal.length, detail: "Có dữ liệu mới trong 120 giây", icon: "✓", tone: "green" as const },
-      { title: "RISK · Nguy cơ", value: risk.length, detail: "Bản ghi mới nhất có trạng thái RISK", icon: "⚠", tone: "amber" as const },
-      { title: "FIRE · Phát hiện cháy", value: fire.length, detail: "Bản ghi mới nhất có trạng thái FIRE", icon: "!", tone: "red" as const },
-      { title: "OFFLINE · Mất kết nối", value: offline.length, detail: "Có bản ghi nhưng quá 120 giây", icon: "◌", tone: "slate" as const },
-      { title: "UNKNOWN · Chưa xác định", value: unknownStatus.length, detail: "Không nhận diện được trạng thái", icon: "?", tone: "blue" as const },
-    ];
+  {
+    title: "TỔNG CẢM BIẾN",
+    value: 50,
+    detail: "Tổng số cảm biến của hệ thống",
+    icon: "⌁",
+    tone: "blue" as const,
+  },
+  {
+    title: "NORMAL · AN TOÀN",
+    value: normal.length,
+    detail: "Cảm biến đang hoạt động an toàn",
+    icon: "✓",
+    tone: "green" as const,
+  },
+  {
+    title: "RISK · NGUY CƠ",
+    value: risk.length,
+    detail: "Cảm biến có cảnh báo nguy cơ",
+    icon: "⚠",
+    tone: "amber" as const,
+  },
+  {
+    title: "FIRE · PHÁT HIỆN CHÁY",
+    value: fire.length,
+    detail: "Cảm biến ghi nhận trạng thái cháy",
+    icon: "!",
+    tone: "red" as const,
+  },
+  {
+    title: "OFFLINE · MẤT KẾT NỐI",
+    value: offline.length,
+    detail: "Cảm biến đã quá thời gian cập nhật",
+    icon: "◌",
+    tone: "slate" as const,
+  },
+  {
+    title: "UNKNOWN · CHƯA XÁC ĐỊNH",
+    value: unknownStatus.length + unknownConnection.length,
+    detail: "Cảm biến chưa xác định được trạng thái",
+    icon: "?",
+    tone: "blue" as const,
+  },
+];
     const breakdown = [
       { label: "NORMAL — An toàn", value: normal.length, color: "bg-emerald-500" },
       { label: "RISK — Nguy cơ", value: risk.length, color: "bg-amber-500" },
