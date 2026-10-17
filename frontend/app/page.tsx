@@ -434,7 +434,38 @@ export default function Home() {
     <aside className={`fixed inset-y-0 left-0 z-50 flex w-[260px] flex-col border-r border-slate-200 bg-white transition-transform lg:translate-x-0 ${mobileMenu ? "translate-x-0" : "-translate-x-full"}`}>
       <div className="flex h-[76px] items-center gap-3 border-b border-slate-100 px-5"><div className="flex h-10 w-10 items-center justify-center rounded-xl bg-blue-600 text-xl font-bold text-white">S</div><div><p className="font-bold text-slate-900">SMART FACTORY</p><p className="mt-0.5 text-[10px] uppercase tracking-[0.16em] text-slate-400">Industrial monitoring</p></div><button onClick={() => setMobileMenu(false)} className="ml-auto lg:hidden" aria-label="Đóng menu">✕</button></div>
       <div className="px-4 pt-6"><div className="rounded-xl border border-emerald-100 bg-emerald-50 p-3"><p className="text-xs font-bold text-emerald-800">● HỆ THỐNG GIÁM SÁT</p><p className="mt-2 text-xs text-emerald-700">Tự động cập nhật mỗi 5 giây.</p></div></div>
-      <nav className="mt-5 flex-1 space-y-1 overflow-y-auto px-3 pb-5">{NAV.map(item => <div key={item.key}>{item.group && <p className="mb-2 mt-5 px-3 text-[10px] font-bold tracking-[0.16em] text-slate-400">{item.group}</p>}<button onClick={() => go(item.key)} className={`flex w-full items-center gap-3 rounded-xl px-3 py-3 text-left text-sm transition ${page === item.key ? "bg-blue-50 font-semibold text-blue-700" : "text-slate-600 hover:bg-slate-50"}`}><span className="flex h-7 w-7 items-center justify-center text-lg">{item.icon}</span><span className="flex-1">{item.label}</span>{item.key === "alerts" && alerts.length > 0 && <span className="rounded-full bg-red-100 px-2 py-0.5 text-xs font-bold text-red-700">{alerts.length}</span></button></div>)}</nav>
+     <nav className="mt-5 flex-1 space-y-1 overflow-y-auto px-3 pb-5">
+  {NAV.map((item) => (
+    <div key={item.key}>
+      {item.group && (
+        <p className="mb-2 mt-5 px-3 text-[10px] font-bold tracking-[0.16em] text-slate-400">
+          {item.group}
+        </p>
+      )}
+
+      <button
+        onClick={() => go(item.key)}
+        className={`flex w-full items-center gap-3 rounded-xl px-3 py-3 text-left text-sm transition ${
+          page === item.key
+            ? "bg-blue-50 font-semibold text-blue-700"
+            : "text-slate-600 hover:bg-slate-50"
+        }`}
+      >
+        <span className="flex h-7 w-7 items-center justify-center text-lg">
+          {item.icon}
+        </span>
+
+        <span className="flex-1">{item.label}</span>
+
+        {item.key === "alerts" && alerts.length > 0 && (
+          <span className="rounded-full bg-red-100 px-2 py-0.5 text-xs font-bold text-red-700">
+            {alerts.length}
+          </span>
+        )}
+      </button>
+    </div>
+  ))}
+</nav>
       <div className="border-t border-slate-100 p-4"><p className="text-center text-[10px] text-slate-400">SMART FACTORY MONITORING</p></div>
     </aside>
 
