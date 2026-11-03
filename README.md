@@ -1,182 +1,90 @@
-# Smart Factory – Real-Time Fire Monitoring & Alerting
+# Smart Factory – Real-Time Fire & Explosion Risk Monitoring
 
-Hệ thống mô phỏng **giám sát và cảnh báo nguy cơ cháy trong nhà máy theo thời gian thực** bằng dữ liệu sensor được sinh tự động.
+Hệ thống prototype giám sát và cảnh báo sớm nguy cơ cháy nổ trong nhà máy, sử dụng dữ liệu cảm biến được mô phỏng bằng Python. Dữ liệu được tiếp nhận qua Apache Kafka, xử lý bằng Spark Structured Streaming, phân loại trạng thái bằng mô hình Machine Learning và hiển thị trên dashboard; các trạng thái nguy cơ được gửi cảnh báo qua Telegram.
 
-Project sử dụng Apache Kafka để tiếp nhận dữ liệu, Spark Structured Streaming để xử lý dữ liệu streaming theo chu kỳ 30 giây, Spark ML với Random Forest để phân loại trạng thái sensor, HDFS để lưu dữ liệu lịch sử, MariaDB để lưu kết quả dự đoán, Streamlit để hiển thị dashboard và Telegram Bot để gửi cảnh báo đến điện thoại.
-
-> **Lưu ý:** Đây là prototype phục vụ mục đích học tập và trình diễn, sử dụng dữ liệu sensor mô phỏng. Hệ thống không phải hệ thống an toàn cháy nổ được chứng nhận cho nhà máy thực tế.
-
----
+> **Phạm vi:** Đây là prototype học tập và trình diễn được kiểm thử trên dữ liệu mô phỏng. Dự án chưa kết nối cảm biến vật lý tại nhà máy và không thay thế hệ thống phát hiện, báo cháy được chứng nhận.
 
 ## 1. Mục tiêu
 
-Hệ thống phân loại tình trạng của sensor thành 3 trạng thái:
+- Mô phỏng dữ liệu cảm biến môi trường tại các khu vực trong nhà máy.
+- Xây dựng luồng xử lý dữ liệu streaming bằng Kafka và Spark Structured Streaming.
+- Huấn luyện, so sánh các mô hình Machine Learning để phân loại trạng thái cảm biến.
+- Lưu dữ liệu lịch sử và kết quả dự đoán.
+- Hiển thị tình trạng nhà máy trên dashboard và gửi cảnh báo Telegram khi phát hiện nguy cơ.
 
-| Label | Trạng thái | Ý nghĩa |
+Hệ thống phân loại dữ liệu thành ba trạng thái:
+
+| Label | Trạng thái | Diễn giải trong mô phỏng |
 |---:|---|---|
-| `0` | `NORMAL` | Điều kiện hoạt động bình thường |
-| `1` | `FIRE_RISK` | Có dấu hiệu bất thường / nguy cơ cháy |
-| `2` | `FIRE` | Phát hiện điều kiện mô phỏng cháy |
+| `0` | `NORMAL` | Điều kiện bình thường |
+| `1` | `FIRE_RISK` | Có dấu hiệu nguy cơ cháy |
+| `2` | `FIRE` | Điều kiện mô phỏng cháy |
 
-Các kịch bản mô phỏng tập trung vào **nhiệt độ, khói, LPG và CO**.
-
----
-
-## 2. Kiến trúc tổng thể
+## 2. Kiến trúc hệ thống
 
 ```text
-                         SMART FACTORY
-                              │
-                    Python Sensor Simulator
-                              │
-                              │ JSON
-                              ▼
-                    ┌────────────────────┐
-                    │       Kafka        │
-                    │ topic: sensor-raw  │
-                    └─────────┬──────────┘
-                              │
-                              ▼
-               ┌─────────────────────────────┐
-               │ Spark Structured Streaming   │
-               │                             │
-               │ - Parse JSON                │
-               │ - Validate / Clean          │
-               │ - Process every 30 seconds  │
-               └────────────┬────────────────┘
-                            │
-                 ┌──────────┴──────────┐
-                 │                     │
-                 ▼                     ▼
-        ┌────────────────┐    ┌──────────────────┐
-        │      HDFS      │    │     Spark ML     │
-        │ Historical data│    │   Random Forest  │
-        └────────────────┘    └────────┬─────────┘
-                                       │
-                                       ▼
-                             ┌──────────────────┐
-                             │    Prediction    │
-                             │                  │
-                             │ 0 NORMAL         │
-                             │ 1 FIRE_RISK      │
-                             │ 2 FIRE           │
-                             └────────┬─────────┘
-                                      │
-                         ┌────────────┴────────────┐
-                         │                         │
-                         ▼                         ▼
-                  ┌──────────────┐          ┌──────────────┐
-                  │   MariaDB    │          │ Telegram Bot │
-                  │ Predictions  │          │   Alerts     │
-                  └──────┬───────┘          └──────┬───────┘
-                         │                         │
-                         ▼                         ▼
-                  ┌──────────────┐                 📱
-                  │   Streamlit  │
-                  │  Dashboard   │
-                  └──────────────┘
-```
-
----
-
-## 3. Luồng dữ liệu
-
-### 3.1. Giai đoạn huấn luyện
-
-```text
-generate_training_data.py
-        ↓
-sensor_training.csv
-        ↓
-HDFS
-        ↓
-train_random_forest.py
-        ↓
-Spark ML – Random Forest
-        ↓
-RF1 / RF2 / RF3 / RF4
-        ↓
-Model lưu trên HDFS
-```
-
-`generate_training_data.py` tạo dữ liệu sensor có nhãn:
-
-```text
-0 = NORMAL
-1 = FIRE_RISK
-2 = FIRE
-```
-
-Mỗi record training gồm các thông tin sensor và `label`.
-
-### 3.2. Giai đoạn chạy thời gian thực
-
-```text
-Python Sensor
-      ↓
-    Kafka
-      ↓
+Python Sensor Simulator
+        │ JSON records
+        ▼
+Apache Kafka (topic: sensor-raw)
+        ▼
 Spark Structured Streaming
-      ↓
-Spark ML Random Forest
-      ↓
-Prediction
-      ↓
- ┌────┴──────┐
- ↓           ↓
-MariaDB   Telegram
- ↓
-Streamlit
+  ├─ Parse JSON
+  ├─ Validate / clean data
+  └─ Process in 30-second microbatches
+        ▼
+Trained Machine Learning Model (Spark ML)
+        │
+        ├──────────────► HDFS: historical sensor data
+        │                and trained model
+        ▼
+Predictions
+  ├─► MariaDB: predictions and class probabilities
+  │       └─► API ─► Next.js Dashboard (deployed on Vercel)
+  └─► Telegram Bot: FIRE_RISK / FIRE alerts
 ```
 
-Dữ liệu streaming **không có `label`**. Model được huấn luyện trước sẽ dự đoán trạng thái cho từng record mới.
-
----
-
-## 4. Mô phỏng sensor
-
-Hệ thống mô phỏng **50 sensor** được phân bố trên 10 khu vực trong nhà máy.
-
-### Các khu vực
+Luồng huấn luyện mô hình được thực hiện trước luồng dự đoán streaming:
 
 ```text
-1. Kho_Nguyen_Lieu
-2. Kho_Vat_Lieu
-3. Kho_Hoa_Chat
-4. Kho_Thanh_Pham
-5. Kho_Linh_Kien
-6. Xuong_San_Xuat
-7. Khu_Dong_Goi
-8. Khu_Kiem_Tra
-9. Phong_May
-10. Khu_Bao_Tri
+Python-generated labeled training data
+        ▼
+Train and evaluate 12 candidate models
+(Random Forest, Decision Tree, Multiclass Logistic Regression)
+        ▼
+Compare evaluation metrics
+        ▼
+Select RF3: Random Forest, 150 trees, max depth 10
+        ▼
+Save trained model to HDFS
+        ▼
+Load model for streaming predictions
 ```
 
-### Mô hình incident
+## 3. Dữ liệu đầu vào
 
-Producer mô phỏng một **incident**:
+### Dữ liệu mô phỏng
 
-```text
-1 incident
-    ↓
-1 khu vực
-    ↓
-3–5 sensor trong khu vực bị ảnh hưởng
-    ↓
-FIRE_RISK
-    ↓
-có thể leo thang thành FIRE
-    ↓
-incident kết thúc
-    ↓
-trạng thái trở lại NORMAL
-```
+- **50 sensor** được phân bố trên **10 khu vực** của nhà máy.
+- Mỗi record chứa thông tin nhận diện sensor, khu vực, thời gian và 5 giá trị cảm biến.
+- Tổng tốc độ sinh dữ liệu mô phỏng khoảng **100 records/second**.
+- Dữ liệu được gửi dưới dạng JSON tới Kafka topic `sensor-raw`.
+- Kafka được cấu hình 3 partitions; cấu hình mô phỏng sử dụng một broker và replication factor 1.
 
----
+Các trường dữ liệu:
 
-## 5. Dữ liệu sensor
+| Field | Ý nghĩa |
+|---|---|
+| `sensor_id` | Mã cảm biến |
+| `zone` | Khu vực trong nhà máy |
+| `timestamp` | Thời điểm ghi nhận |
+| `temperature` | Nhiệt độ (°C) |
+| `humidity` | Độ ẩm (%) |
+| `smoke_ppm` | Nồng độ khói |
+| `lpg_gas_ppm` | Nồng độ khí LPG |
+| `co_gas_ppm` | Nồng độ khí CO |
 
-Ví dụ một message Kafka:
+Ví dụ message:
 
 ```json
 {
@@ -191,30 +99,13 @@ Ví dụ một message Kafka:
 }
 ```
 
-### Ý nghĩa các trường
+Dữ liệu streaming không chứa `label`. Nhãn chỉ có trong dữ liệu huấn luyện; mô hình đã huấn luyện sẽ dự đoán trạng thái của record mới.
 
-| Trường | Ý nghĩa |
-|---|---|
-| `sensor_id` | Mã sensor |
-| `zone` | Khu vực đặt sensor |
-| `timestamp` | Thời gian ghi nhận |
-| `temperature` | Nhiệt độ (°C) |
-| `humidity` | Độ ẩm (%) |
-| `smoke_ppm` | Nồng độ khói |
-| `lpg_gas_ppm` | Nồng độ LPG |
-| `co_gas_ppm` | Nồng độ CO |
+## 4. Machine Learning
 
-`label` **không được gửi trong dữ liệu streaming**.
+### Bài toán
 
----
-
-## 6. Spark ML – Random Forest
-
-Project sử dụng **Spark ML** với thuật toán Random Forest cho bài toán phân loại 3 lớp.
-
-### Features
-
-Model sử dụng:
+Đây là bài toán **học có giám sát – phân loại đa lớp (3-class classification)** trên dữ liệu dạng bảng. Mô hình sử dụng 5 đặc trưng:
 
 ```text
 temperature
@@ -224,375 +115,123 @@ lpg_gas_ppm
 co_gas_ppm
 ```
 
-### 4 cấu hình thử nghiệm
+### Dữ liệu huấn luyện
 
-| Model | numTrees | maxDepth |
-|---|---:|---:|
-| RF1 | 50 | 5 |
-| RF2 | 100 | 8 |
-| RF3 | 150 | 10 |
-| RF4 | 200 | 12 |
+- 30.000 records được sinh tổng hợp bằng Python.
+- 10.000 records cho mỗi lớp: `NORMAL`, `FIRE_RISK`, `FIRE`.
+- Các giá trị được tạo theo phân phối mô phỏng; một phần vùng giá trị giữa các lớp có chồng lấn.
+- Đây không phải dữ liệu đo đạc thực tế từ nhà máy.
 
-Các model được đánh giá bằng Accuracy, F1, Weighted Precision, Weighted Recall, Confusion Matrix và training time.
+### Các mô hình được so sánh
 
-Model sau khi train được lưu trên HDFS.
+Dự án đánh giá 12 cấu hình mô hình:
 
----
+| Thuật toán | Số cấu hình |
+|---|---:|
+| Random Forest | 4 |
+| Decision Tree | 4 |
+| Multiclass Logistic Regression | 4 |
+| **Tổng** | **12** |
 
-## 7. HDFS
+Mô hình được lựa chọn là **RF3 – Random Forest**, với `150 trees` và `max depth = 10`, dựa trên việc so sánh các chỉ số đánh giá.
 
-### Training data
+### Kết quả đánh giá
 
-```text
-/smart_factory_training/sensor_training.csv
-```
+| Tập đánh giá | Kết quả |
+|---|---:|
+| Test set của RF3 (5.968 records) | Accuracy / Precision / Recall / F1-score: **98.01%** |
+| 9.000 records từ luồng mô phỏng | 8.976 dự đoán đúng (**99.73%**) |
 
-### Historical streaming data
+Trong kết quả trên luồng mô phỏng, 24 record `FIRE_RISK` bị phân loại thành `FIRE`.
 
-```text
-/data/sensor_historical
-```
+> Các chỉ số được tính trên dữ liệu tổng hợp/mô phỏng, không thể được xem là độ chính xác đã xác nhận trong môi trường nhà máy thực tế.
 
-### Random Forest models
+### Feature importance của RF3
 
-```text
-/smart_factory_project/models/
-├── random_forest_3class_rf1
-├── random_forest_3class_rf2
-├── random_forest_3class_rf3
-└── random_forest_3class_rf4
-```
+| Feature | Mức độ quan trọng |
+|---|---:|
+| CO | 0.3981 |
+| Temperature | 0.2099 |
+| Smoke | 0.1881 |
+| LPG | 0.1841 |
+| Humidity | 0.0197 |
 
----
+Trong mô hình RF3, CO có mức độ quan trọng cao nhất; độ ẩm thấp nhất theo kết quả feature importance.
 
-## 8. MariaDB
+## 5. Xử lý dữ liệu streaming
 
-Database:
+Spark Structured Streaming thực hiện các bước chính:
 
-```text
-smart_factory
-```
+1. Đọc JSON records từ Kafka topic `sensor-raw`.
+2. Parse, kiểm tra và làm sạch dữ liệu.
+3. Xử lý theo microbatch 30 giây.
+4. Áp dụng mô hình RF3 đã huấn luyện để dự đoán trạng thái.
+5. Ghi dữ liệu lịch sử/kết quả dự đoán tới các thành phần lưu trữ tương ứng.
+6. Kích hoạt logic cảnh báo Telegram đối với `FIRE_RISK` và `FIRE`.
 
-Table:
-
-```text
-sensor_predictions
-```
-
-Các trường chính:
-
-```text
-id
-sensor_id
-zone
-timestamp
-temperature
-humidity
-smoke_ppm
-lpg_gas_ppm
-co_gas_ppm
-prediction
-prediction_label
-probability_normal
-probability_risk
-probability_fire
-created_at
-```
-
-Mapping:
-
-```text
-prediction = 0 → NORMAL
-prediction = 1 → FIRE_RISK
-prediction = 2 → FIRE
-```
-
----
-
-## 9. Telegram Alert
-
-### Logic cảnh báo
-
-```text
-NORMAL
-→ Không gửi cảnh báo
-
-FIRE_RISK
-→ Cảnh báo nguy cơ cháy
-
-FIRE
-→ Cảnh báo cháy khẩn cấp
-```
-
-Nếu trong cùng một batch 30 giây có cả `FIRE_RISK` và `FIRE`:
-
-```text
-→ Chỉ gửi 1 tin Telegram
-→ FIRE được ưu tiên
-→ Vẫn liệt kê FIRE_RISK
-```
-
-Nếu có nhiều sensor trong cùng khu vực, các sensor được gom vào nội dung cảnh báo.
-
-Ví dụ:
-
-```text
-🔥 CẢNH BÁO CHÁY KHẨN CẤP 🔥
-
-Sensor: SENSOR_013
-Khu vực: Kho_Hoa_Chat
-Thời gian: 2026-10-02 14:30:00
-
-Nhiệt độ: 75.50 °C
-Khói: 650.00 ppm
-LPG: 850.00 ppm
-CO: 180.00 ppm
-Trạng thái: FIRE
-Xác suất FIRE: 97.35%
-```
-
----
-
-## 10. Streamlit Dashboard
-
-Dashboard đọc dữ liệu từ MariaDB và tự refresh mỗi 30 giây.
-
-### Nội dung chính
-
-```text
-📊 Tổng quan
-├── Tổng record
-├── NORMAL
-├── FIRE_RISK
-└── FIRE
-
-📡 Dữ liệu sensor mới nhất
-
-🚨 Cảnh báo gần nhất
-
-🏭 Các khu vực đang có cảnh báo
-```
-
----
-
-## 11. Cấu trúc thư mục
-
-```text
-smart_factory_project/
-│
-├── data/
-│   ├── sensor_schema.json
-│   └── training_data/
-│       └── sensor_training.csv
-│
-├── simulator/
-│   └── sensor_producer.py
-│
-├── spark/
-│   ├── train_random_forest.py
-│   ├── spark_streaming_core.py
-│   ├── spark_streaming_mariadb.py
-│   └── telegram_alert.py
-│
-├── jars/
-│   └── mariadb-java-client-3.5.6.jar
-│
-├── generate_training_data.py
-├── dashboard.py
-├── .gitignore
-└── venv/
-```
-
----
-
-## 12. Môi trường chính
-
-```text
-Python
-Apache Kafka
-Apache Spark
-Spark Structured Streaming
-Spark ML
-HDFS
-YARN
-MariaDB
-Streamlit
-Telegram Bot
-```
-
-Kafka connector:
-
-```text
-org.apache.spark:spark-sql-kafka-0-10_2.12:3.5.5
-```
-
-MariaDB JDBC:
-
-```text
-mariadb-java-client-3.5.6.jar
-```
-
----
-
-## 13. Biến môi trường
-
-Không lưu secret trực tiếp trong source code.
-
-```bash
-export MARIADB_PASSWORD='your_mariadb_password'
-export TELEGRAM_BOT_TOKEN='your_telegram_bot_token'
-export TELEGRAM_CHAT_ID='your_telegram_chat_id'
-```
-
-Không commit các giá trị thật lên GitHub.
-
----
-
-## 14. Cách chạy
-
-### 1. Hadoop
-
-```bash
-start-dfs.sh
-start-yarn.sh
-```
-
-### 2. MariaDB
-
-```bash
-sudo systemctl start mariadb
-```
-
-### 3. Kafka
-
-```bash
-cd ~/kafka_2.12-2.8.1
-
-bin/zookeeper-server-start.sh -daemon config/zookeeper.properties
-bin/kafka-server-start.sh -daemon config/server.properties
-```
-
-### 4. Sensor
-
-```bash
-cd ~/smart_factory_project
-source venv/bin/activate
-
-python3 simulator/sensor_producer.py
-```
-
-### 5. Spark → HDFS
-
-```bash
-cd ~/smart_factory_project
-
-$SPARK_HOME/bin/spark-submit --packages org.apache.spark:spark-sql-kafka-0-10_2.12:3.5.5 spark/spark_streaming_core.py
-```
-
-### 6. Spark ML → MariaDB → Telegram
-
-```bash
-cd ~/smart_factory_project
-source venv/bin/activate
-
-export MARIADB_PASSWORD='your_mariadb_password'
-export TELEGRAM_BOT_TOKEN='your_telegram_bot_token'
-export TELEGRAM_CHAT_ID='your_telegram_chat_id'
-
-$SPARK_HOME/bin/spark-submit --packages org.apache.spark:spark-sql-kafka-0-10_2.12:3.5.5 --jars ~/smart_factory_project/jars/mariadb-java-client-3.5.6.jar spark/spark_streaming_mariadb.py
-```
-
-### 7. Streamlit
-
-```bash
-cd ~/smart_factory_project
-source venv/bin/activate
-
-export MARIADB_PASSWORD='your_mariadb_password'
-
-streamlit run dashboard.py
-```
-
-Mở:
-
-```text
-http://localhost:8501
-```
-
----
-
-## 15. Kiểm tra nhanh
-
-### Kafka
-
-```bash
-cd ~/kafka_2.12-2.8.1
-
-bin/kafka-console-consumer.sh --bootstrap-server localhost:9092 --topic sensor-raw
-```
+## 6. Lưu trữ và hiển thị
 
 ### HDFS
 
-```bash
-hdfs dfs -ls /data/sensor_historical
-```
-
-### Model
-
-```bash
-hdfs dfs -ls /smart_factory_project/models
-```
+HDFS được sử dụng để lưu dữ liệu cảm biến lịch sử và mô hình Machine Learning đã huấn luyện.
 
 ### MariaDB
 
-```sql
-USE smart_factory;
+MariaDB lưu kết quả dự đoán và phân phối xác suất theo lớp. Các trường kết quả bao gồm trạng thái dự đoán và xác suất của `NORMAL`, `FIRE_RISK`, `FIRE`.
 
-SELECT
-    prediction,
-    prediction_label,
-    COUNT(*) AS total
-FROM sensor_predictions
-GROUP BY prediction, prediction_label
-ORDER BY prediction;
-```
+### Dashboard
 
----
+Dashboard được xây dựng bằng **Next.js** và triển khai trên **Vercel**. Dashboard lấy dữ liệu thông qua API và MariaDB, tự cập nhật mỗi **5 giây**.
 
-## 16. Thành viên
+Các khu vực chức năng chính:
 
-| Thành viên | Vai trò |
+- Overview
+- Sensor Monitoring
+- Factory Areas
+- Alerts
+- History
+- AI
+
+## 7. Telegram Alert
+
+Hệ thống gửi thông báo khi mô hình dự đoán:
+
+| Prediction | Hành động |
 |---|---|
-| Nong Nhu Quynh | Team Leader & Spark Streaming Lead |
-| Trieu Tien Dat | Data Engineer & Kafka Lead |
-| Ha Thi Xuan | Machine Learning Engineer |
-| Le Tran Thu Thao | Storage & Big Data Infrastructure Engineer |
-| To Thi Ngoc Anh | Dashboard, Alert & QA Lead |
+| `NORMAL` | Không gửi cảnh báo |
+| `FIRE_RISK` | Gửi cảnh báo nguy cơ cháy |
+| `FIRE` | Gửi cảnh báo cháy khẩn cấp |
 
----
+Thông báo được tổng hợp theo dữ liệu của batch; nếu có cả `FIRE_RISK` và `FIRE`, mức `FIRE` được ưu tiên trong tiêu đề cảnh báo.
 
-## 17. Trạng thái project
+## 8. Công nghệ sử dụng
 
-```text
-Python Sensor                ✅
-Apache Kafka                 ✅
-Spark Structured Streaming  ✅
-HDFS                         ✅
-Spark ML / Random Forest     ✅
-MariaDB                      ✅
-Telegram Bot                 ✅
-Streamlit                    ✅
-GitHub                       ✅
-```
+| Thành phần | Công nghệ |
+|---|---|
+| Sinh dữ liệu cảm biến | Python |
+| Message streaming | Apache Kafka |
+| Xử lý streaming | Apache Spark Structured Streaming |
+| Machine Learning | Spark ML: Random Forest, Decision Tree, Multiclass Logistic Regression |
+| Lưu dữ liệu lịch sử / model | HDFS |
+| Lưu dự đoán | MariaDB |
+| Dashboard | Next.js, Vercel |
+| API | API kết nối dashboard với dữ liệu dự đoán |
+| Cảnh báo | Telegram Bot API |
 
----
+## 9. Trạng thái triển khai
 
-## 18. Lưu ý
+Prototype đã hoàn thành các phần chính:
 
-Project sử dụng dữ liệu được sinh tổng hợp bằng Python. Các ngưỡng và khoảng giá trị sensor phục vụ mô phỏng và trình diễn, không phải ngưỡng an toàn được chứng nhận cho nhà máy thực tế.
+- Mô phỏng dữ liệu sensor.
+- Tiếp nhận dữ liệu qua Kafka.
+- Xử lý dữ liệu bằng Spark Structured Streaming.
+- Huấn luyện và so sánh mô hình Machine Learning.
+- Lưu dữ liệu lịch sử, mô hình và kết quả dự đoán.
+- Tích hợp dashboard và Telegram alert.
+- Kiểm thử tích hợp và đánh giá trên dữ liệu mô phỏng.
 
----
+**Giới hạn hiện tại:** Hệ thống chưa sử dụng sensor vật lý và chưa được xác thực bằng dữ liệu vận hành thực tế. Bước phát triển tiếp theo là kết nối thiết bị IoT, thu thập dữ liệu hiện trường và đánh giá lại mô hình trong điều kiện thực tế.
 
-## License
+## 10. License / mục đích sử dụng
 
-Project được thực hiện cho mục đích học tập và trình diễn trong môn Big Data.
+Dự án được thực hiện cho mục đích học tập, nghiên cứu và trình diễn trong môn Big Data. Các giá trị cảm biến và kịch bản cảnh báo là dữ liệu mô phỏng, không phải ngưỡng an toàn được chứng nhận.
